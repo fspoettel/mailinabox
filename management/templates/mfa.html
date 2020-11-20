@@ -101,7 +101,7 @@ and ensure every administrator account for this control panel does the same.</st
 </div>
 
 <script>
-    var el = {
+    var el_mfa = {
         disableForm: document.getElementById('disable-2fa'),
         output: document.getElementById('output-2fa'),
         totpSetupForm: document.getElementById('totp-setup'),
@@ -111,21 +111,21 @@ and ensure every administrator account for this control panel does the same.</st
         totpQr: document.getElementById('totp-setup-qr'),
         totpSetupSubmit: document.querySelector('#totp-setup-submit'),
         wrapper: document.querySelector('.twofactor')
-    }
+    };
 
     function update_setup_disabled(evt) {
         var val = evt.target.value.trim();
 
         if (
             typeof val !== 'string' ||
-            typeof el.totpSetupSecret.value !== 'string' ||
+            typeof el_mfa.totpSetupSecret.value !== 'string' ||
             val.length !== 6 ||
-            el.totpSetupSecret.value.length !== 32 ||
+            el_mfa.totpSetupSecret.value.length !== 32 ||
             !(/^\+?\d+$/.test(val))
         ) {
-            el.totpSetupSubmit.setAttribute('disabled', '');
+            el_mfa.totpSetupSubmit.setAttribute('disabled', '');
         } else {
-            el.totpSetupSubmit.removeAttribute('disabled');
+            el_mfa.totpSetupSubmit.removeAttribute('disabled');
         }
     }
 
@@ -136,65 +136,65 @@ and ensure every administrator account for this control panel does the same.</st
         var code = document.createElement('div');
         code.innerHTML = `Secret: ${provisioned_totp.secret}`;
 
-        el.totpQr.appendChild(img);
-        el.totpQr.appendChild(code);
+        el_mfa.totpQr.appendChild(img);
+        el_mfa.totpQr.appendChild(code);
 
-        el.totpSetupToken.addEventListener('input', update_setup_disabled);
-        el.totpSetupForm.addEventListener('submit', do_enable_totp);
+        el_mfa.totpSetupToken.addEventListener('input', update_setup_disabled);
+        el_mfa.totpSetupForm.addEventListener('submit', do_enable_totp);
 
-        el.totpSetupSecret.setAttribute('value', provisioned_totp.secret);
+        el_mfa.totpSetupSecret.setAttribute('value', provisioned_totp.secret);
 
-        el.wrapper.classList.add('disabled');
+        el_mfa.wrapper.classList.add('disabled');
     }
 
-    function render_disable(mfa) {
-        el.disableForm.addEventListener('submit', do_disable);
-        el.wrapper.classList.add('enabled');
+    function render_disable_mfa(mfa) {
+        el_mfa.disableForm.addEventListener('submit', do_disable_mfa);
+        el_mfa.wrapper.classList.add('enabled');
         if (mfa.label)
           $("#mfa-device-label").text(" on device '" + mfa.label + "'");
     }
 
-    function hide_error() {
-        el.output.querySelector('.panel-body').innerHTML = '';
-        el.output.classList.remove('visible');
+    function hide_mfa_error() {
+        el_mfa.output.querySelector('.panel-body').innerHTML = '';
+        el_mfa.output.classList.remove('visible');
     }
 
-    function render_error(msg) {
-        el.output.querySelector('.panel-body').innerHTML = msg;
-        el.output.classList.add('visible');
+    function render_mfa_error(msg) {
+        el_mfa.output.querySelector('.panel-body').innerHTML = msg;
+        el_mfa.output.classList.add('visible');
     }
 
-    function reset_view() {
-        el.wrapper.classList.remove('loaded', 'disabled', 'enabled');
+    function reset_mfa_view() {
+        el_mfa.wrapper.classList.remove('loaded', 'disabled', 'enabled');
 
-        el.disableForm.removeEventListener('submit', do_disable);
+        el_mfa.disableForm.removeEventListener('submit', do_disable_mfa);
 
-        hide_error();
+        hide_mfa_error();
 
-        el.totpSetupForm.reset();
-        el.totpSetupForm.removeEventListener('submit', do_enable_totp);
+        el_mfa.totpSetupForm.reset();
+        el_mfa.totpSetupForm.removeEventListener('submit', do_enable_totp);
 
-        el.totpSetupSecret.setAttribute('value', '');
-        el.totpSetupToken.removeEventListener('input', update_setup_disabled);
+        el_mfa.totpSetupSecret.setAttribute('value', '');
+        el_mfa.totpSetupToken.removeEventListener('input', update_setup_disabled);
 
-        el.totpSetupSubmit.setAttribute('disabled', '');
-        el.totpQr.innerHTML = '';
+        el_mfa.totpSetupSubmit.setAttribute('disabled', '');
+        el_mfa.totpQr.innerHTML = '';
     }
 
     function show_mfa() {
-        reset_view();
+        reset_mfa_view();
 
         api(
             '/mfa/status',
             'POST',
             {},
             function(res) {
-                el.wrapper.classList.add('loaded');
+                el_mfa.wrapper.classList.add('loaded');
 
                 var has_mfa = false;
                 res.enabled_mfa.forEach(function(mfa) {
                     if (mfa.type == "totp") {
-                        render_disable(mfa);
+                        render_disable_mfa(mfa);
                         has_mfa = true;
                     }
                 });
@@ -205,7 +205,7 @@ and ensure every administrator account for this control panel does the same.</st
         );
     }
 
-    function do_disable(evt) {
+    function do_disable_mfa(evt) {
         evt.preventDefault();
         hide_error();
 
@@ -223,18 +223,18 @@ and ensure every administrator account for this control panel does the same.</st
 
     function do_enable_totp(evt) {
         evt.preventDefault();
-        hide_error();
+        hide_mfa_error();
 
         api(
             '/mfa/totp/enable',
             'POST',
             {
-                token: $(el.totpSetupToken).val(),
-                secret: $(el.totpSetupSecret).val(),
-                label: $(el.totpSetupLabel).val()
+                token: $(el_mfa.totpSetupToken).val(),
+                secret: $(el_mfa.totpSetupSecret).val(),
+                label: $(el_mfa.totpSetupLabel).val()
             },
             function(res) { do_logout(); },
-            function(res) { render_error(res); }
+            function(res) { render_mfa_error(res); }
         );
 
         return false;
