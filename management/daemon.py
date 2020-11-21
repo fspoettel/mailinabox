@@ -19,6 +19,7 @@ from mailconfig import get_mail_users, get_mail_users_ex, get_admins, add_mail_u
 from mailconfig import get_mail_user_privileges, add_remove_mail_user_privilege
 from mailconfig import get_mail_aliases, get_mail_aliases_ex, get_mail_domains, add_mail_alias, remove_mail_alias
 from mfa import get_public_mfa_state, provision_totp, validate_totp_secret, enable_mfa, disable_mfa
+from api_keys import get_api_keys, create_api_key, remove_api_key
 
 env = utils.load_environment()
 
@@ -466,6 +467,29 @@ def totp_post_disable():
 		return "OK"
 	else: # error
 		return ("Invalid user or MFA id.", 400)
+
+# API keys
+
+@app.route('/api_keys')
+@authorized_personnel_only
+def get_api_keys_route():
+	api_keys = get_api_keys(request.user_email, env)
+	return json_response(api_keys)
+
+@app.route('/api_keys/create', methods=['POST'])
+@authorized_personnel_only
+def create_api_key_route():
+	label = request.form.get('label')
+	scopes = request.form.get('scopes') or 'admin'
+	res = create_api_key(request.user_email, label, scopes, env)
+	return json_response(res)
+
+@app.route('/api_keys/remove', methods=['POST'])
+@authorized_personnel_only
+def remove_api_key_route():
+	key_id = request.form.get('id')
+	remove_api_key(request.user_email, key_id, env)
+	return "OK"
 
 # WEB
 

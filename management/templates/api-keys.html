@@ -1,0 +1,291 @@
+<style>
+    .apikeys .loading-indicator,
+    #apikeys-create-output {
+        display: none;
+    }
+
+    .apikeys.loading .loading-indicator {
+        display: block;
+    }
+
+    .apikeys.loading #apikeys-create,
+    .apikeys.loading #apikeys-display,
+    .apikeys.loading .apikeys-display {
+        display: none;
+    }
+
+    #apikeys-create-output.visible {
+        display: block;
+    }
+
+    #apikeys-create-output-token {
+        margin-top: 0.5em;
+    }
+
+    .form-group_scopes .help-block p {
+        margin-top: 1em;
+        margin-bottom: 0.5em;
+    }
+
+    .form-group_scopes .help-block ul {
+        margin-top: 0;
+        padding-left: 1.5em;
+        font-size: 90%;
+    }
+
+    .form-group_submit {
+        margin-top: 24px;
+    }
+</style>
+
+<h2>API Keys</h2>
+<p class="text-warning">This is an advanced configuration page.</p>
+
+<div class="apikeys loading">
+    <div class="loading-indicator">Loading...</div>
+
+    <form id="apikeys-create">
+        <h3>New API key</h3>
+        <div class="form-group">
+            <label for="label">Note</label>
+            <input type="text" class="form-control" required name="label" placeholder="What is this API key for?">
+        </div>
+        <div class="form-group form-group_scopes">
+            <h4>Select scopes</h4>
+            <div class="checkbox">
+                <label>
+                    <input disabled checked type="checkbox" name="scopes" value="admin" aria-describedby="help-block">admin
+                </label>
+                <div class="help-block">
+                    <p>Scopes define the access for API keys. In addition to the permissions configured above, API keys have the following restrictions applied to them:</p>
+                    <ul>
+                        <li>you can't use API keys to log into the control panel</li>
+                        <li>you can't use API keys to add or remove admin privileges</li>
+                        <li>you can't use API keys to add or remove admin users</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="form-group form-group_submit">
+            <button id="apikeys-create-submit" type="submit" class="btn btn-primary">Create API key</button>
+        </div>
+    </form>
+
+    <div id="apikeys-create-output" class="panel panel-success">
+        <div class="panel-heading">
+            <h3 class="panel-title">Successfully created &quot;<span id="apikeys-create-output-label"></span>&quot;</h3>
+        </div>
+        <div class="panel-body">
+            Make sure to copy your new API key token now. You won’t be able to see it again!
+            <pre id="apikeys-create-output-token"></pre>
+        </div>
+    </div>
+
+    <div class="apikeys-display">
+        <h3>Existing API keys</h3>
+        <p>API keys you have generated that can be used to access this mailinabox's admin functionality.</p>
+        <table id="apikeys-table" class="table table-striped">
+            <thead>
+                <th colspan="2">Label</th>
+                <th>Scopes</th>
+                <th>Created</th>
+                <th>Last Used</th>
+                <th colspan="2">Actions</th>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(function() {
+    const el = {
+        createForm: document.getElementById('apikeys-create'),
+        output: document.getElementById('apikeys-create-output'),
+        outputPre: document.getElementById('apikeys-create-output-token'),
+        outputLabel: document.getElementById('apikeys-create-output-label'),
+        table: document.getElementById('apikeys-table'),
+        tbody: document.querySelector('#apikeys-table tbody'),
+        wrapper: document.querySelector('.apikeys'),
+    };
+
+    const initialState = {
+        initialized: false,
+        /* represents keys persisted server-side */
+        keys: [],
+        /* Api keys are stored as hashes upon creation.
+         * In order to show the user their API key once, we return in the create
+         * call and store it here.
+         * The user should only see these once and hence this should be cleared
+         * on navigation.
+         */
+         createdKey: null,
+         createdId: null
+    };
+
+    let state = Object.assign({}, initialState);
+
+    function timeAgo(date) {
+        const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+
+        const daysBetween = (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
+
+        let diff = daysBetween;
+        let unit = 'day';
+
+        if (daysBetween >= 730) {
+            unit = 'year';
+            diff = Math.round(diff / 365);
+        } else if (daysBetween >= 60) {
+            unit = 'month';
+            diff = now.getMonth() - date.getMonth() + (12 * (now.getFullYear() - date.getFullYear()));
+        } else if (daysBetween >= 14) {
+            unit = 'week';
+            diff = diff / 7;
+        }
+
+        return rtf.format(-1 * diff, unit);
+    }
+
+    function renderPlaceholder() {
+        const tr = $.parseHTML('<tr><td colspan="6">No active API keys associated with your user account.</td></tr>');
+        return tr[0];
+    }
+
+    function renderApiKey(key) {
+        const createdAt = new Date(key.created_at);
+        const lastUsed = key.mru ? new Date(key.mru) : null;
+
+        const tr = $(`
+            <tr class="${key.id === state.createdId ? 'success' : ''}">
+                <td colspan="2">${key.label}</td>
+                <td>${key.scopes}</td>
+                <td title="${createdAt.toISOString()}">${timeAgo(createdAt)}</td>
+                <td title="${lastUsed ? lastUsed.toISOString() : 'never'}">${lastUsed ? timeAgo(lastUsed) : 'never'}</td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-xs" data-id="${key.id}" onclick="remove_api_key(event)">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `);
+        return tr[0];
+    }
+
+    function renderApiKeys() {
+        el.tbody.innerHTML = '';
+        if (!state.initialized) return;
+
+        if (state.keys.length === 0) {
+            el.tbody.appendChild(renderPlaceholder());
+        } else {
+            state.keys.forEach(function(key) {
+                el.tbody.appendChild(renderApiKey(key));
+            });
+        }
+    }
+
+    function rendercreatedKey() {
+        if (state.createdId == null) {
+            el.outputPre.innerHTML = '';
+            el.outputLabel.innerHTML = '';
+            el.output.classList.remove('visible');
+            return;
+        }
+
+        const key = state.keys.find(function (k) {
+            return k.id === state.createdId;
+        })
+
+        el.outputPre.innerHTML = state.createdKey;
+        el.outputLabel.innerHTML = key.label;
+        el.output.classList.add('visible');
+    }
+
+    function render() {
+        el.createForm.removeEventListener('submit', createApiKey);
+
+        if (state.initialized) {
+            el.createForm.addEventListener('submit', createApiKey);
+            el.wrapper.classList.remove('loading');
+        } else {
+            el.wrapper.classList.add('loading');
+        }
+
+        renderApiKeys();
+        rendercreatedKey();
+    }
+
+    function resetApiKeyState() {
+        state = Object.assign({}, initialState);
+    }
+
+    function showApiKeys() {
+        function onSuccess(res) {
+            state.keys = res;
+            state.initialized = true;
+            render();
+        }
+        api('/api_keys', 'GET', {}, onSuccess);
+    }
+
+    function hideApiKeys() {
+        resetApiKeyState();
+        render();
+    }
+
+    function removeApiKey(evt) {
+        evt.preventDefault();
+        const id = event.target.dataset.id;
+
+        function onSuccess(res) {
+            const keyIndex = state.keys.findIndex(function(k) {
+                return `${k.id}` === `${id}`;
+            });
+            state.keys.splice(keyIndex, 1);
+            render();
+        }
+
+        api(
+            '/api_keys/remove',
+            'POST',
+            { id: id },
+            onSuccess,
+        );
+
+        return false;
+    }
+
+    function createApiKey(evt) {
+        evt.preventDefault();
+        const formData = new FormData(evt.target);
+
+        function onSuccess(res) {
+            state.keys.push(res.api_key);
+            state.createdId = res.api_key.id;
+            state.createdKey = res.key;
+            render();
+            evt.target.reset();
+        }
+
+        api(
+            '/api_keys/create',
+            'POST',
+            {
+                label: formData.get('label'),
+                scopes: formData.getAll('scopes'),
+            },
+            onSuccess,
+        )
+
+        return false;
+    }
+
+    window['show_api_keys'] = showApiKeys;
+    window['hide_api_keys'] = hideApiKeys;
+    window['remove_api_key'] = removeApiKey;
+})();
+</script>

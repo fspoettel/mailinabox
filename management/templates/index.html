@@ -91,6 +91,7 @@
                 <li><a href="#system_backup" onclick="return show_panel(this);">Backup Status</a></li>
                 <li class="divider"></li>
                 <li class="dropdown-header">Advanced Pages</li>
+                <li><a href="#api_keys" onclick="return show_panel(this);">API Keys</a></li>
                 <li><a href="#custom_dns" onclick="return show_panel(this);">Custom DNS</a></li>
                 <li><a href="#external_dns" onclick="return show_panel(this);">External DNS</a></li>
                 <li><a href="/admin/munin" target="_blank">Munin Monitoring</a></li>
@@ -136,6 +137,10 @@
 
       <div id="panel_mfa" class="admin_panel">
       {% include "mfa.html" %}
+      </div>
+
+      <div id="panel_api_keys" class="admin_panel">
+      {% include "api-keys.html" %}
       </div>
 
       <div id="panel_login" class="admin_panel">

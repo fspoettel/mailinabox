@@ -186,6 +186,11 @@ def migration_13(env):
 	db = os.path.join(env["STORAGE_ROOT"], 'mail/users.sqlite')
 	shell("check_call", ["sqlite3", db, "CREATE TABLE mfa (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, type TEXT NOT NULL, secret TEXT NOT NULL, mru_token TEXT, label TEXT, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE);"])
 
+def migration_14(env):
+	# Add the "api_keys" table for configuring API keys to the control panel.
+	db = os.path.join(env["STORAGE_ROOT"], 'mail/users.sqlite')
+	shell("check_call", ["sqlite3", db, "CREATE TABLE api_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, key_hash TEXT NOT NULL, scopes TEXT NOT NULL, label TEXT NOT NULL, expires_in INTEGER, mru DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE);"])
+
 ###########################################################
 
 def get_current_migration():
