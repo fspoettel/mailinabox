@@ -381,6 +381,10 @@ function show_panel(panelid) {
     panelid = panelid.getAttribute('href').substring(1);
 
   $('.admin_panel').hide();
+  if (current_panel && window["hide_" + current_panel]) {
+    window["hide_" + current_panel]();
+  }
+
   $('#panel_' + panelid).show();
   if (typeof localStorage != 'undefined')
     localStorage.setItem("miab-cp-lastpanel", panelid);
