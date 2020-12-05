@@ -2,7 +2,8 @@ import hashlib
 import secrets
 from mailconfig import open_database
 
-KEY_INFO_FIELDS = "id, label, scopes, created_at, expires_in"
+# public representation of an api key that can be displayed in the control panel
+KEY_INFO_FIELDS = "id, label, scopes, created_at, expires_in, mru"
 
 
 def to_key_info_dict(r):
@@ -12,6 +13,22 @@ def to_key_info_dict(r):
         "scopes": r[2],
         "created_at": r[3],
         "expires_in": r[4],
+        "mru": r[5],
+    }
+
+
+# private representation of an api key that can be used in the auth flow
+KEY_CREDENTIAL_FIELDS = "id, user_id, key_hash, scopes, expires_in, mru"
+
+
+def to_key_credential_dict(r):
+    return {
+        "id": r[0],
+        "user_id": r[1],
+        "key_hash": r[2],
+        "scopes": r[3],
+        "expires_in": r[4],
+        "mru": r[5],
     }
 
 
@@ -21,15 +38,6 @@ def get_user_id(email, c):
     if not r:
         raise ValueError("User does not exist.")
     return r[0]
-
-
-def get_api_keys(email, env):
-    c = open_database(env)
-    c.execute(
-        "SELECT {f} FROM api_keys WHERE user_id=?".format(f=KEY_INFO_FIELDS),
-        (get_user_id(email, c),),
-    )
-    return [to_key_info_dict(r) for r in c.fetchall()]
 
 
 def create_api_key(email, label, scopes, env):
@@ -60,3 +68,21 @@ def remove_api_key(email, key_id, env):
     user_id = get_user_id(email, c)
     c.execute("DELETE FROM api_keys WHERE user_id=? AND id=?", (user_id, key_id))
     conn.commit()
+
+
+def get_api_key_infos(email, env):
+    c = open_database(env)
+    c.execute(
+        "SELECT {f} FROM api_keys WHERE user_id=?".format(f=KEY_INFO_FIELDS),
+        (get_user_id(email, c),),
+    )
+    return [to_key_info_dict(r) for r in c.fetchall()]
+
+
+def get_api_key_credentials(email, env):
+    c = open_database(env)
+    c.execute(
+        "SELECT {f} FROM api_keys WHERE user_id=?".format(f=KEY_CREDENTIAL_FIELDS),
+        (get_user_id(email, c),),
+    )
+    return [to_key_credential_dict(r) for r in c.fetchall()]

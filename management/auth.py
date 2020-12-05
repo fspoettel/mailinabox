@@ -1,6 +1,6 @@
 import base64, os, os.path, hmac, json
 
-from flask import make_response
+from flask import make_response, Response
 
 import utils
 from mailconfig import get_mail_password, get_mail_user_privileges
@@ -41,7 +41,7 @@ class KeyAuthService:
 		with create_file_with_mode(self.key_path, 0o640) as key_file:
 			key_file.write(self.key + '\n')
 
-	def authenticate(self, request, env):
+	def authenticate(self, request, env, allow_api_keys):
 		"""Test if the client key passed in HTTP Authorization header matches the service key
 		or if the or username/password passed in the header matches an administrator user.
 		Returns a tuple of the user's email address and list of user privileges (e.g.
@@ -152,6 +152,30 @@ class KeyAuthService:
 		# Make the HMAC.
 		hash_key = self.key.encode('ascii')
 		return hmac.new(hash_key, msg, digestmod="sha256").hexdigest()
+
+	def construct_error_response(self, request, e):
+		error_message = str(e)
+		status = 401
+		headers = {
+			'WWW-Authenticate': 'Basic realm="{0}"'.format(self.auth_realm),
+			'X-Reason': error_message,
+		}
+
+		if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+			# Don't issue a 401 to an AJAX request because the user will
+			# be prompted for credentials, which is not helpful.
+			status = 403
+			headers = None
+
+		if request.headers.get('Accept') in (None, "", "*/*"):
+			# Return plain text output.
+			return Response(error_message+"\n", status=status, mimetype='text/plain', headers=headers)
+		else:
+			# Return JSON output.
+			return Response(json.dumps({
+				"status": "error",
+				"reason": error_message,
+				})+"\n", status=status, mimetype='application/json', headers=headers)
 
 	def _generate_key(self):
 		raw_key = os.urandom(32)
